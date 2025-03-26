@@ -55,7 +55,7 @@ class YouTubeAudioExtractor:
     def _get_po_token(self, video_id):
         """Get PO token using Node.js helper"""
         if not self.node_installed:
-            return None
+            return None, None
         
         try:
             import subprocess
@@ -70,11 +70,11 @@ class YouTubeAudioExtractor:
             
             try:
                 response = json.loads(result.stdout)
-                return response.get('token')
+                return response.get('token'), response.get('visitorData')
             except:
-                return None
+                return None, None
         except:
-            return None
+            return None, None
 
     def get_audio_stream(self, youtube_url: str, preferred_format: str = None) -> Union[Dict, None]:
         """
@@ -102,8 +102,8 @@ class YouTubeAudioExtractor:
                     'stream': None
                 }
 
-            # Get PO token
-            po_token = self._get_po_token(video_id)
+            # Get PO token and visitor data
+            po_token, visitor_data = self._get_po_token(video_id)
             
             # Create a YouTube object with WEB client and PoToken
             yt = pytubefix.YouTube(
@@ -116,6 +116,11 @@ class YouTubeAudioExtractor:
             
             # Set client to WEB
             yt.client = 'WEB'
+            
+            # If we have PoToken and visitor data, set them
+            if po_token and visitor_data:
+                yt.po_token = po_token
+                yt.visitor_data = visitor_data
             
             # Get all audio streams
             audio_streams = yt.streams.filter(only_audio=True)
