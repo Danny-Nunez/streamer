@@ -102,8 +102,16 @@ class YouTubeAudioExtractor:
                     'stream': None
                 }
 
-            # Create a YouTube object with WEB client
-            yt = pytubefix.YouTube(youtube_url, use_oauth=False, allow_oauth_cache=True)
+            # Get PO token
+            po_token = self._get_po_token(video_id)
+            
+            # Create a YouTube object with WEB client and PoToken
+            yt = pytubefix.YouTube(
+                youtube_url,
+                use_oauth=False,
+                allow_oauth_cache=True,
+                use_po_token=True if po_token else False
+            )
             yt.use_oauth = False  # Ensure OAuth is disabled
             
             # Set client to WEB
