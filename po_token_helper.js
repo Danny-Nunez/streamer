@@ -1,32 +1,25 @@
-const { getInfo } = require('@distube/ytdl-core');
+const { generateToken } = require('youtube-po-token-generator');
 
 async function getPOToken(videoId) {
     try {
-        console.log(`Attempting to get info for video ID: ${videoId}`);
-        const info = await getInfo(`https://www.youtube.com/watch?v=${videoId}`, {
-            lang: 'en',
-            requestOptions: {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                }
-            }
-        });
-
-        console.log('Successfully retrieved video info');
+        console.log(`Attempting to get token for video ID: ${videoId}`);
         
         // Generate a more reliable visitor data string
         const timestamp = Date.now();
         const random = Math.floor(Math.random() * 1000000);
         const visitorData = Buffer.from(`${timestamp}.${random}`).toString('base64');
         
-        if (!info.poToken) {
-            console.error('No poToken found in video info');
+        // Get the token using the generator
+        const token = await generateToken(videoId);
+        
+        if (!token) {
+            console.error('Failed to generate token');
             return null;
         }
 
         console.log('Successfully generated token and visitor data');
         return { 
-            token: info.poToken, 
+            token, 
             visitorData,
             timestamp: timestamp 
         };
