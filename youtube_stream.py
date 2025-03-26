@@ -25,7 +25,56 @@ class AudioStream:
 
 class YouTubeAudioExtractor:
     def __init__(self):
-        pass
+        self.node_installed = self._check_node_installed()
+
+    def _check_node_installed(self):
+        """Check if Node.js is installed"""
+        try:
+            import subprocess
+            subprocess.run(['node', '--version'], capture_output=True, check=True)
+            # Install dependencies if node is installed
+            subprocess.run(['npm', 'install'], capture_output=True, check=True)
+            return True
+        except:
+            return False
+
+    def _get_video_id(self, url):
+        """Extract video ID from URL"""
+        import re
+        patterns = [
+            r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+            r'(?:embed\/)([0-9A-Za-z_-]{11})',
+            r'(?:shorts\/)([0-9A-Za-z_-]{11})'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        return None
+
+    def _get_po_token(self, video_id):
+        """Get PO token using Node.js helper"""
+        if not self.node_installed:
+            return None
+        
+        try:
+            import subprocess
+            import json
+            
+            result = subprocess.run(
+                ['node', 'po_token_helper.js', video_id],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            try:
+                response = json.loads(result.stdout)
+                return response.get('token')
+            except:
+                return None
+        except:
+            return None
 
     def get_audio_stream(self, youtube_url: str, preferred_format: str = None) -> Union[Dict, None]:
         """
@@ -44,8 +93,21 @@ class YouTubeAudioExtractor:
             }
         """
         try:
-            # Create a YouTube object
-            yt = pytubefix.YouTube(youtube_url)
+            # Get video ID and PO token
+            video_id = self._get_video_id(youtube_url)
+            if not video_id:
+                return {
+                    'status': 'error',
+                    'message': 'Invalid YouTube URL',
+                    'stream': None
+                }
+
+            # Create a YouTube object with WEB client
+            yt = pytubefix.YouTube(youtube_url, use_oauth=False, allow_oauth_cache=True)
+            yt.use_oauth = False  # Ensure OAuth is disabled
+            
+            # Set client to WEB
+            yt.client = 'WEB'
             
             # Get all audio streams
             audio_streams = yt.streams.filter(only_audio=True)

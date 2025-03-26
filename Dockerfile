@@ -1,13 +1,15 @@
-# Use Python 3.11 slim as base image
-FROM python:3.11-slim
+# Use Node.js base image with Python
+FROM nikolaik/python-nodejs:python3.11-nodejs20-slim
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+# Copy package.json and install Node.js dependencies first
+COPY package.json .
+RUN npm install
 
-# Install dependencies
+# Copy Python requirements and install
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

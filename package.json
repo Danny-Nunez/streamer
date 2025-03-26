@@ -1,0 +1,8 @@
+{
+  "name": "youtube-stream-helper",
+  "version": "1.0.0",
+  "description": "Helper for YouTube stream extraction",
+  "dependencies": {
+    "@distube/ytdl-core": "^4.13.3"
+  }
+}
