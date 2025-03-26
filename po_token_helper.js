@@ -3,8 +3,10 @@ const { generatePOToken } = require('@distube/ytdl-core');
 async function getPOToken(videoId) {
     try {
         const poToken = await generatePOToken(videoId);
-        // Generate a random visitor data string (YouTube format)
-        const visitorData = Buffer.from(Math.random().toString()).toString('base64');
+        // Generate a more reliable visitor data string
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 1000000);
+        const visitorData = Buffer.from(`${timestamp}.${random}`).toString('base64');
         return { token: poToken, visitorData };
     } catch (error) {
         console.error('Error generating PO token:', error);
