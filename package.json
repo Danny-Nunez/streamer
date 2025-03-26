@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "Helper for YouTube stream extraction",
   "dependencies": {
-    "youtube-po-token-generator": "^1.0.0"
+    "axios": "^1.6.7"
   }
 }

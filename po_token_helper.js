@@ -1,4 +1,4 @@
-const { generateToken } = require('youtube-po-token-generator');
+const axios = require('axios');
 
 async function getPOToken(videoId) {
     try {
@@ -9,15 +9,34 @@ async function getPOToken(videoId) {
         const random = Math.floor(Math.random() * 1000000);
         const visitorData = Buffer.from(`${timestamp}.${random}`).toString('base64');
         
-        // Get the token using the generator
-        const token = await generateToken(videoId);
+        // Make a request to YouTube to get the token
+        const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            }
+        });
+
+        // Extract the token from the response
+        const html = response.data;
+        const tokenMatch = html.match(/"poToken":"([^"]+)"/);
         
-        if (!token) {
-            console.error('Failed to generate token');
+        if (!tokenMatch) {
+            console.error('No token found in response');
             return null;
         }
 
+        const token = tokenMatch[1];
         console.log('Successfully generated token and visitor data');
+        
         return { 
             token, 
             visitorData,
