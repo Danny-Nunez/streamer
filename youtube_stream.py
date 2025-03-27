@@ -255,37 +255,24 @@ class YouTubeAudioExtractor:
                     
                     # Add required parameters for video access
                     params = VIDEO_STREAM_SETTINGS.copy()
-                    params['c'] = YOUTUBE_CLIENT
-                    
-                    # Add proxy IP if available
-                    if SERVER_ENV and PROXY_URL:
-                        try:
-                            # Extract IP from proxy URL
-                            proxy_parts = PROXY_URL.split('@')
-                            if len(proxy_parts) > 1:
-                                proxy_host = proxy_parts[1].split(':')[0]
-                                # Use a default IP if we can't get the actual one
-                                params['ip'] = '187.17.136.44'  # Example IP from working URL
-                                params['ipbits'] = '0'
-                        except Exception as e:
-                            print(f"Warning: Could not extract proxy IP: {e}")
                     
                     # Add additional required parameters
                     params.update({
                         'ei': 'w6jlZ6GYCcKf4dUPk5X6kAc',  # Example from working URL
-                        'xpc': 'EgVo2aDSNQ==',
                         'met': str(int(time.time())),
-                        'mh': 'DQ',
-                        'mm': '31,26',
-                        'mn': 'sn-pmcg-4vgl,sn-gpv7kne7',
-                        'ms': 'au,onr',
-                        'mv': 'm',
-                        'mvi': '12',
-                        'pl': '24',
-                        'initcwndbps': '2036250',
+                        'bui': 'AccgBcNca_Jhp4k784mlbZh4m1856WjMR8k251ssBES40_1E02ld97SAoQ5kmt3gzk6-OlNXPHt3u26V',
+                        'spc': '_S3wKp5K7XuiCZ0Vn9Q4nDrCbQeScVBRxnNqrCYiOgHlyKSPKqzQdJIct2m9WCza',
+                        'clen': str(stream.filesize),
+                        'dur': str(stream_info.length),
+                        'lmt': str(int(time.time() * 1000)),
+                        'mt': str(int(time.time())),
                         'fvip': '5',
                         'keepalive': 'yes'
                     })
+                    
+                    # Remove IP-related parameters that could cause playback issues
+                    params.pop('ip', None)
+                    params.pop('ipbits', None)
                     
                     # Build URL with parameters
                     stream_info.url += '&'.join(f"{k}={v}" for k, v in params.items())

@@ -91,7 +91,6 @@ YOUTUBE_HEADERS = {
 VIDEO_STREAM_SETTINGS = {
     'range': '0-',
     'redirector': '1',
-    'ipbits': '0',
     'mh': 'DQ',
     'mm': '31,26',
     'mn': 'sn-pmcg-4vgl,sn-gpv7kne7',
@@ -110,7 +109,9 @@ VIDEO_STREAM_SETTINGS = {
     'fvip': '5',
     'requiressl': 'yes',
     'initcwndbps': '2036250',
-    'xpc': 'EgVo2aDSNQ=='
+    'xpc': 'EgVo2aDSNQ==',
+    'source': 'youtube',
+    'c': 'ANDROID'
 }
 
 # Video URL access settings
