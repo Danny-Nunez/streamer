@@ -154,11 +154,12 @@ async def get_stream(request: Request, video_id: str, format: Optional[str] = No
 
 @app.get("/api/stream/{video_id}/download")
 @limiter.limit("50/hour")
-async def download_audio(video_id: str):
+async def download_audio(request: Request, video_id: str):
     """
     Download and stream audio directly for mobile playback
     
     Args:
+        request: FastAPI Request object
         video_id: YouTube video ID
     """
     try:
