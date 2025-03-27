@@ -2,35 +2,11 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-async function loadSavedToken() {
-    try {
-        const tokenPath = path.join(__dirname, '..', 'token.json');
-        if (fs.existsSync(tokenPath)) {
-            const tokenData = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
-            // Check if token is less than 1 hour old
-            if (Date.now() - tokenData.timestamp < 3600000) {
-                return tokenData;
-            }
-        }
-    } catch (error) {
-        console.error('Error loading saved token:', error.message);
-    }
-    return null;
-}
-
-async function generateToken() {
-    // Try to load saved token first
-    const savedToken = await loadSavedToken();
-    if (savedToken) {
-        console.log('Using saved token');
-        return savedToken;
-    }
-
+async function saveToken() {
     let browser = null;
     try {
         browser = await puppeteer.launch({
             headless: true,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
 
@@ -83,9 +59,10 @@ async function generateToken() {
             timestamp: Date.now()
         };
 
-        // Save the new token
+        // Save token to file
         const tokenPath = path.join(__dirname, '..', 'token.json');
         fs.writeFileSync(tokenPath, JSON.stringify(tokenData, null, 2));
+        console.log('Token saved successfully to token.json');
 
         return tokenData;
     } catch (error) {
@@ -98,12 +75,13 @@ async function generateToken() {
     }
 }
 
-// Generate and output the token
-generateToken().then(result => {
+// Generate and save the token
+saveToken().then(result => {
     if (result) {
-        console.log(JSON.stringify(result));
+        console.log('Token saved successfully');
     } else {
-        console.log(JSON.stringify({ error: 'Failed to generate token' }));
+        console.error('Failed to save token');
+        process.exit(1);
     }
 }).catch(error => {
     console.error('Unexpected error:', error);
