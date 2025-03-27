@@ -73,8 +73,8 @@ def po_token_verifier() -> Tuple[str, str]:
         print(f"Error in po_token_verifier: {e}")
         # Return a fallback token if generation fails
         timestamp = int(time.time() * 1000)
-        random = random.randint(0, 1000000)
-        visitor_data = base64.b64encode(f"{timestamp}.{random}".encode()).decode()
+        random_value = random.randint(0, 1000000)
+        visitor_data = base64.b64encode(f"{timestamp}.{random_value}".encode()).decode()
         return visitor_data, ""
 
 class YouTubeAudioExtractor:
