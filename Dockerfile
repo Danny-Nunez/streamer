@@ -4,8 +4,8 @@ FROM nikolaik/python-nodejs:python3.11-nodejs20-slim
 # Set working directory
 WORKDIR /app
 
-# Create a non-root user
-RUN useradd -m -u 1000 appuser && \
+# Create a non-root user with a different UID
+RUN useradd -m -u 1001 appuser && \
     mkdir -p /app && \
     chown -R appuser:appuser /app
 

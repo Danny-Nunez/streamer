@@ -47,10 +47,15 @@ def generate_youtube_token() -> dict:
     node_modules_path = os.path.join(os.path.dirname(__file__), 'node_modules')
     env = os.environ.copy()
     env['NODE_PATH'] = node_modules_path
-    result = cmd(f"node {script_path}", env=env)
-    data = json.loads(result.stdout)
-    print(f"Token generation result: {data}")
-    return data
+    env['HOME'] = '/app'  # Set HOME to /app for npm
+    try:
+        result = cmd(f"node {script_path}", env=env)
+        data = json.loads(result.stdout)
+        print(f"Token generation result: {data}")
+        return data
+    except Exception as e:
+        print(f"Error generating token: {e}")
+        return {"error": str(e)}
 
 def po_token_verifier() -> Tuple[str, str]:
     """Get visitor data and PoToken for YouTube"""
@@ -66,9 +71,14 @@ class YouTubeAudioExtractor:
         try:
             cmd('node --version')
             # Install dependencies if node is installed
-            cmd('npm install')
+            try:
+                cmd('npm install --prefix /app')
+            except Exception as e:
+                print(f"Warning: npm install failed: {e}")
+                print("Continuing anyway as node_modules might already be installed")
             return True
-        except:
+        except Exception as e:
+            print(f"Node.js check failed: {e}")
             return False
 
     def _get_video_id(self, url):
