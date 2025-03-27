@@ -15,7 +15,7 @@ import subprocess
 import json
 import os
 import time
-from config import PROXY_URL, SERVER_ENV, mark_proxy_failed, get_proxy_url
+from config import PROXY_URL, SERVER_ENV, mark_proxy_failed, get_proxy_url, VIDEO_HEADERS
 
 @dataclass
 class AudioStream:
@@ -64,9 +64,10 @@ def generate_youtube_token() -> dict:
         print(f"Using proxy: {PROXY_URL}")
     
     try:
-        # First ensure the package is installed
-        print("Installing youtube-po-token-generator...")
-        cmd(f"npm install youtube-po-token-generator --prefix {current_dir}", env=env)
+        # Only install if node_modules doesn't exist
+        if not os.path.exists(node_modules_path):
+            print("Installing youtube-po-token-generator...")
+            cmd(f"npm install youtube-po-token-generator --prefix {current_dir}", env=env)
         
         # Run the token generator script
         print("Running token generator script...")
@@ -77,7 +78,6 @@ def generate_youtube_token() -> dict:
         
         # Parse the token data from stdout
         try:
-            # Clean the output to ensure we only have the JSON data
             output = result.stdout.strip()
             if not output:
                 raise Exception("No output received from token generator")
@@ -117,16 +117,11 @@ def po_token_verifier() -> Tuple[str, str]:
                 # Check if token is less than 1 hour old
                 if time.time() * 1000 - token_data['timestamp'] < 3600000:
                     print("Using saved token data")
-                    print(f"Visitor Data: {token_data['visitorData']}")
-                    print(f"PoToken: {token_data['poToken']}")
                     return token_data['visitorData'], token_data['poToken']
         
         # If no valid saved token, generate a new one
         print("Generating new token")
         token_object = generate_youtube_token()
-        print(f"Generated new token data:")
-        print(f"Visitor Data: {token_object['visitorData']}")
-        print(f"PoToken: {token_object['poToken']}")
         return token_object['visitorData'], token_object['poToken']
     except Exception as e:
         print(f"Error in po_token_verifier: {e}")
@@ -135,18 +130,14 @@ def po_token_verifier() -> Tuple[str, str]:
 class YouTubeAudioExtractor:
     def __init__(self):
         self.node_installed = self._check_node_installed()
+        self._token_cache = {}
+        self._token_cache_time = 0
+        self._token_cache_duration = 3600  # 1 hour in seconds
 
     def _check_node_installed(self):
         """Check if Node.js is installed"""
         try:
             cmd('node --version')
-            # Install dependencies if node is installed
-            try:
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                cmd(f'npm install --prefix {current_dir}')
-            except Exception as e:
-                print(f"Warning: npm install failed: {e}")
-                print("Continuing anyway as node_modules might already be installed")
             return True
         except Exception as e:
             print(f"Node.js check failed: {e}")
@@ -219,7 +210,8 @@ class YouTubeAudioExtractor:
                         use_oauth=False,
                         allow_oauth_cache=True,
                         proxies=proxies if proxies else None,
-                        use_po_token=False  # Disable po_token for ANDROID client
+                        use_po_token=False,  # Disable po_token for ANDROID client
+                        on_progress_callback=None  # Disable progress callback for faster processing
                     )
                     
                     # Get audio streams
@@ -247,6 +239,19 @@ class YouTubeAudioExtractor:
                         author=yt.author,
                         length=yt.length
                     )
+                    
+                    # Add headers to the URL
+                    if '?' in stream_info.url:
+                        stream_info.url += '&'
+                    else:
+                        stream_info.url += '?'
+                    
+                    # Add headers as URL parameters
+                    for key, value in VIDEO_HEADERS.items():
+                        stream_info.url += f"{key}={value}&"
+                    
+                    # Remove trailing '&'
+                    stream_info.url = stream_info.url.rstrip('&')
                     
                     return {
                         'status': 'success',

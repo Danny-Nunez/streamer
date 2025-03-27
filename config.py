@@ -85,4 +85,18 @@ YOUTUBE_HEADERS = {
     'X-YouTube-Device-Model': 'SM-S908B',
     'X-YouTube-Device-OS': 'Android',
     'X-YouTube-Device-OS-Version': '13'
+}
+
+# Video URL access settings
+VIDEO_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Range': 'bytes=0-',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'cross-site',
+    'Sec-Fetch-Dest': 'audio',
+    'Referer': 'https://www.youtube.com/',
+    'Origin': 'https://www.youtube.com'
 } 
