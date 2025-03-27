@@ -4,9 +4,14 @@ FROM nikolaik/python-nodejs:python3.11-nodejs20-slim
 # Set working directory
 WORKDIR /app
 
+# Create a non-root user
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app && \
+    chown -R appuser:appuser /app
+
 # Copy package.json and install Node.js dependencies first
 COPY package.json .
-RUN npm install
+RUN npm install --prefix /app
 
 # Copy Python requirements and install
 COPY requirements.txt .
@@ -16,15 +21,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Set permissions for the application directory
-RUN chmod -R 755 /app \
-    && chown -R nobody:nogroup /app
+RUN chown -R appuser:appuser /app
 
-# Create directory for Node.js cache
-RUN mkdir -p /app/.npm \
-    && chown -R nobody:nogroup /app/.npm
+# Create directory for Node.js cache and set permissions
+RUN mkdir -p /app/.npm && \
+    chown -R appuser:appuser /app/.npm
 
 # Switch to non-root user
-USER nobody
+USER appuser
 
 # Expose port
 EXPOSE 8000

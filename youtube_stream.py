@@ -26,13 +26,13 @@ class AudioStream:
     author: str
     length: int
 
-def cmd(command: str, check: bool = True, shell: bool = True, capture_output: bool = True, text: bool = True):
+def cmd(command: str, check: bool = True, shell: bool = True, capture_output: bool = True, text: bool = True, env: dict = None):
     """
     Runs a command in a shell, and throws an exception if the return code is non-zero.
     """
     print(f"Running command: {command}")
     try:
-        return subprocess.run(command, check=check, shell=shell, capture_output=capture_output, text=text)
+        return subprocess.run(command, check=check, shell=shell, capture_output=capture_output, text=text, env=env)
     except subprocess.CalledProcessError as error:
         print(f"Command failed with exit code: {error.returncode}")
         print(f"stdout: {error.stdout}")
@@ -43,7 +43,11 @@ def generate_youtube_token() -> dict:
     """Generate YouTube token using Node.js script"""
     print("Generating YouTube token")
     script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'youtube-token-generator.js')
-    result = cmd(f"node {script_path}")
+    # Use absolute path for node_modules
+    node_modules_path = os.path.join(os.path.dirname(__file__), 'node_modules')
+    env = os.environ.copy()
+    env['NODE_PATH'] = node_modules_path
+    result = cmd(f"node {script_path}", env=env)
     data = json.loads(result.stdout)
     print(f"Token generation result: {data}")
     return data
