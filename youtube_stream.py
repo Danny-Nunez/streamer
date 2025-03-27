@@ -354,43 +354,19 @@ class YouTubeAudioExtractor:
                     # Build URL with parameters
                     stream_info.url += '&'.join(f"{k}={v}" for k, v in params.items())
                     
-                    # Create player URL with stream data and proxy information
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    proxy_info = {
-                        'username': PROXY_USERNAME,
-                        'password': PROXY_PASSWORD,
-                        'host': PROXY_HOST,
-                        'port': PROXY_URL.split(':')[-1]
-                    } if SERVER_ENV and PROXY_URL else None
-                    
                     # Download the audio file
                     try:
-                        local_path = download_audio(youtube_url, proxy_info)
+                        local_path = download_audio(youtube_url, proxies)
                         print(f"Audio downloaded to: {local_path}")
                         self._downloaded_files.add(local_path)  # Track the new file
                     except Exception as e:
                         print(f"Failed to download audio: {e}")
                         local_path = None
                     
-                    player_data = {
-                        'url': stream_info.url,
-                        'local_path': local_path,
-                        'title': stream_info.title,
-                        'author': stream_info.author,
-                        'format': stream_info.format,
-                        'bitrate': stream_info.bitrate,
-                        'mime_type': stream_info.mime_type,
-                        'proxy': proxy_info
-                    }
-                    
-                    player_url = f"file://{os.path.join(current_dir, 'player.html')}?data=" + urllib.parse.quote(json.dumps(player_data))
-                    
                     return {
                         'status': 'success',
                         'message': 'Audio stream found',
                         'stream': stream_info,
-                        'player_url': player_url,
-                        'proxy_info': proxy_info,
                         'local_path': local_path
                     }
                     

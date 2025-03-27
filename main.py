@@ -140,8 +140,7 @@ async def get_stream(request: Request, video_id: str, format: Optional[str] = No
                 "title": stream.title,
                 "author": stream.author,
                 "length": stream.length,
-                "local_path": result.get("local_path"),
-                "proxy_info": result.get("proxy_info")
+                "local_path": result.get("local_path")
             }
         }
         
