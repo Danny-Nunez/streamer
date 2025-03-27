@@ -5,25 +5,63 @@ Configuration settings for the YouTube stream extractor
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import random
+import time
 
 # Load environment variables from .env file if it exists
 env_path = Path('.env')
 if env_path.exists():
     load_dotenv()
 
-# Proxy settings (all optional)
-PROXY_USERNAME = os.getenv('PROXY_USERNAME')
-PROXY_PASSWORD = os.getenv('PROXY_PASSWORD')
-PROXY_HOST = os.getenv('PROXY_HOST')
-PROXY_PORT = os.getenv('PROXY_PORT')
+# Proxy settings
+PROXY_USERNAME = os.getenv('PROXY_USERNAME', 'spj8zjg34x')
+PROXY_PASSWORD = os.getenv('PROXY_PASSWORD', 'pyYgPna58y+B80yjHk')
+PROXY_HOST = os.getenv('PROXY_HOST', 'gate.smartproxy.com')
 
-# Construct proxy URLs only if all credentials are provided and non-empty
-PROXY_URL = None
-if all([PROXY_USERNAME, PROXY_PASSWORD, PROXY_HOST, PROXY_PORT]):
-    PROXY_URL = f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@{PROXY_HOST}:{PROXY_PORT}"
+# List of available proxy ports
+PROXY_PORTS = [10001, 10002, 10003, 10004, 10005, 10006, 10007]
+
+# Track failed ports to avoid reusing them immediately
+failed_ports = set()
+last_proxy_reset = time.time()
+PROXY_RESET_INTERVAL = 300  # Reset failed ports every 5 minutes
+
+def get_proxy_url():
+    """Get a working proxy URL with rotation and error handling"""
+    global failed_ports, last_proxy_reset
+    
+    # Reset failed ports after interval
+    if time.time() - last_proxy_reset > PROXY_RESET_INTERVAL:
+        failed_ports.clear()
+        last_proxy_reset = time.time()
+    
+    # Get available ports
+    available_ports = [port for port in PROXY_PORTS if port not in failed_ports]
+    
+    # If all ports failed, reset and try again
+    if not available_ports:
+        failed_ports.clear()
+        available_ports = PROXY_PORTS
+    
+    # Select random port from available ones
+    port = random.choice(available_ports)
+    
+    return f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@{PROXY_HOST}:{port}"
+
+def mark_proxy_failed(proxy_url):
+    """Mark a proxy as failed to avoid reusing it immediately"""
+    try:
+        port = int(proxy_url.split(':')[-1])
+        if port in PROXY_PORTS:
+            failed_ports.add(port)
+    except:
+        pass
+
+# Get initial proxy URL
+PROXY_URL = get_proxy_url()
 
 # Environment settings
-SERVER_ENV = False  # Force local environment for testing
+SERVER_ENV = os.getenv('SERVER_ENV', 'true').lower() == 'true'
 
 # YouTube settings
 YOUTUBE_CLIENT = 'ANDROID'  # Use ANDROID client for better compatibility

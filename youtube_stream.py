@@ -15,7 +15,7 @@ import subprocess
 import json
 import os
 import time
-from config import PROXY_URL, SERVER_ENV
+from config import PROXY_URL, SERVER_ENV, mark_proxy_failed, get_proxy_url
 
 @dataclass
 class AudioStream:
@@ -55,9 +55,14 @@ def generate_youtube_token() -> dict:
     # Set proxy if configured
     if SERVER_ENV and PROXY_URL:
         env['HTTPS_PROXY'] = PROXY_URL
+        env['HTTP_PROXY'] = PROXY_URL
         print(f"Using proxy: {PROXY_URL}")
     
     try:
+        # First ensure the package is installed
+        cmd(f"npm install youtube-po-token-generator --prefix {current_dir}", env=env)
+        
+        # Run the token generator script
         result = cmd(f"node {script_path}", env=env)
         if result.returncode != 0:
             raise Exception(f"Token generation failed with exit code {result.returncode}")
@@ -96,10 +101,7 @@ def po_token_verifier() -> Tuple[str, str]:
                     print("Using saved token data")
                     print(f"Visitor Data: {token_data['visitorData']}")
                     print(f"PoToken: {token_data['poToken']}")
-                    # Ensure tokens are properly URL encoded
-                    visitor_data = token_data['visitorData']
-                    po_token = token_data['poToken']
-                    return visitor_data, po_token
+                    return token_data['visitorData'], token_data['poToken']
         
         # If no valid saved token, generate a new one
         print("Generating new token")
@@ -107,10 +109,7 @@ def po_token_verifier() -> Tuple[str, str]:
         print(f"Generated new token data:")
         print(f"Visitor Data: {token_object['visitorData']}")
         print(f"PoToken: {token_object['poToken']}")
-        # Ensure tokens are properly URL encoded
-        visitor_data = token_object['visitorData']
-        po_token = token_object['poToken']
-        return visitor_data, po_token
+        return token_object['visitorData'], token_object['poToken']
     except Exception as e:
         print(f"Error in po_token_verifier: {e}")
         raise
@@ -191,69 +190,74 @@ class YouTubeAudioExtractor:
             # Get visitor data and poToken
             visitor_data, po_token = po_token_verifier()
             
-            # Create YouTube object with ANDROID client
-            yt = pytubefix.YouTube(
-                youtube_url,
-                client='ANDROID',  # Use ANDROID client which doesn't require po_token
-                use_oauth=False,
-                allow_oauth_cache=True,
-                proxies=proxies if proxies else None,
-                use_po_token=False  # Disable po_token for ANDROID client
-            )
-            
-            # Get audio streams
-            audio_streams = yt.streams.filter(only_audio=True)
-            if not audio_streams:
-                return {
-                    'status': 'error',
-                    'message': 'No audio streams found',
-                    'stream': None
-                }
-
-            # Select the best quality audio stream
-            selected_stream = None
-            
-            if preferred_format:
-                # Try to find stream with preferred format first
-                format_streams = [s for s in audio_streams if s.subtype == preferred_format]
-                if format_streams:
-                    # Try to sort by bitrate if available
-                    try:
-                        selected_stream = max(format_streams, key=lambda s: int(s.abr[:-4]) if s.abr else 0)
-                    except (AttributeError, ValueError):
-                        selected_stream = format_streams[0]
-            
-            if not selected_stream:
-                # Get highest quality stream regardless of format
+            # Try up to 3 different proxies if needed
+            max_retries = 3
+            for attempt in range(max_retries):
                 try:
-                    selected_stream = max(audio_streams, key=lambda s: int(s.abr[:-4]) if s.abr else 0)
-                except (AttributeError, ValueError):
-                    selected_stream = audio_streams[0]
-            
-            if not selected_stream:
-                return {
-                    'status': 'error',
-                    'message': 'Could not select appropriate audio stream',
-                    'stream': None
-                }
-
-            # Create AudioStream object with stream information
-            stream_info = AudioStream(
-                url=selected_stream.url,
-                format=selected_stream.subtype,
-                bitrate=getattr(selected_stream, 'abr', 'unknown'),
-                mime_type=selected_stream.mime_type,
-                filesize=selected_stream.filesize,
-                title=yt.title,
-                author=yt.author,
-                length=yt.length
-            )
-
-            return {
-                'status': 'success',
-                'message': 'Audio stream found',
-                'stream': stream_info
-            }
+                    # Create YouTube object with ANDROID client
+                    yt = pytubefix.YouTube(
+                        youtube_url,
+                        client='ANDROID',  # Use ANDROID client which is more reliable
+                        use_oauth=False,
+                        allow_oauth_cache=True,
+                        proxies=proxies if proxies else None,
+                        use_po_token=False  # Disable po_token for ANDROID client
+                    )
+                    
+                    # Get audio streams
+                    print("Getting audio streams...")
+                    streams = yt.streams.filter(only_audio=True)
+                    if not streams:
+                        raise Exception("No audio streams found")
+                    
+                    # Select the best quality stream
+                    stream = streams.get_highest_resolution()
+                    if not stream:
+                        stream = streams.first()
+                    
+                    if not stream:
+                        raise Exception("No suitable audio stream found")
+                    
+                    # Create AudioStream object
+                    stream_info = AudioStream(
+                        url=stream.url,
+                        format=stream.mime_type.split('/')[1],
+                        bitrate=f"{stream.bitrate // 1000}kbps",
+                        mime_type=stream.mime_type,
+                        filesize=stream.filesize,
+                        title=yt.title,
+                        author=yt.author,
+                        length=yt.length
+                    )
+                    
+                    return {
+                        'status': 'success',
+                        'message': 'Audio stream found',
+                        'stream': stream_info
+                    }
+                    
+                except Exception as e:
+                    if SERVER_ENV and PROXY_URL:
+                        # Mark current proxy as failed
+                        mark_proxy_failed(PROXY_URL)
+                        
+                        # Get new proxy if not last attempt
+                        if attempt < max_retries - 1:
+                            new_proxy = get_proxy_url()
+                            proxies = {
+                                'http': new_proxy,
+                                'https': new_proxy
+                            }
+                            print(f"Retrying with new proxy: {new_proxy}")
+                            continue
+                    
+                    # If all retries failed or no proxy, raise the error
+                    print(f"Error in get_audio_stream: {str(e)}")
+                    return {
+                        'status': 'error',
+                        'message': str(e),
+                        'stream': None
+                    }
 
         except Exception as e:
             print(f"Error in get_audio_stream: {str(e)}")
