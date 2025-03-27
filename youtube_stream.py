@@ -21,9 +21,14 @@ from config import (
     mark_proxy_failed, 
     get_proxy_url, 
     VIDEO_STREAM_SETTINGS,
-    YOUTUBE_CLIENT
+    YOUTUBE_CLIENT,
+    PROXY_USERNAME,
+    PROXY_PASSWORD,
+    PROXY_HOST
 )
 import urllib.parse
+import requests
+from pathlib import Path
 
 @dataclass
 class AudioStream:
@@ -135,12 +140,71 @@ def po_token_verifier() -> Tuple[str, str]:
         print(f"Error in po_token_verifier: {e}")
         raise
 
+def cleanup_old_files(audio_dir: Path, max_age_hours: int = 1):
+    """Remove audio files older than max_age_hours"""
+    try:
+        current_time = time.time()
+        for file in audio_dir.glob('audio_*.mp3'):
+            file_age = current_time - file.stat().st_mtime
+            if file_age > (max_age_hours * 3600):
+                file.unlink()
+                print(f"Cleaned up old file: {file}")
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+
+def download_audio(url: str, proxy_info: dict = None) -> str:
+    """Download audio file and return the local path"""
+    try:
+        # Create audios directory if it doesn't exist
+        audio_dir = Path('audios')
+        audio_dir.mkdir(exist_ok=True)
+        
+        # Clean up old files before downloading new ones
+        cleanup_old_files(audio_dir)
+        
+        # Generate unique filename
+        timestamp = int(time.time())
+        filename = f"audio_{timestamp}.mp3"
+        filepath = audio_dir / filename
+        
+        # Set up proxy if provided
+        proxies = None
+        if proxy_info:
+            proxy_url = f"http://{proxy_info['username']}:{proxy_info['password']}@{proxy_info['host']}:{proxy_info['port']}"
+            proxies = {
+                'http': proxy_url,
+                'https': proxy_url
+            }
+        
+        # Create a YouTube object with the URL
+        yt = pytubefix.YouTube(
+            url,
+            proxies=proxies,
+            use_oauth=False,
+            allow_oauth_cache=True
+        )
+        
+        # Get the audio stream
+        stream = yt.streams.filter(only_audio=True).first()
+        if not stream:
+            raise Exception("No audio stream found")
+        
+        # Download the file
+        print(f"Downloading audio to {filepath}...")
+        stream.download(output_path=str(audio_dir), filename=filename)
+        
+        return str(filepath)
+    except Exception as e:
+        print(f"Error downloading audio: {e}")
+        raise
+
 class YouTubeAudioExtractor:
     def __init__(self):
         self.node_installed = self._check_node_installed()
         self._token_cache = {}
         self._token_cache_time = 0
         self._token_cache_duration = 3600  # 1 hour in seconds
+        self._downloaded_files = set()  # Track downloaded files
 
     def _check_node_installed(self):
         """Check if Node.js is installed"""
@@ -228,8 +292,20 @@ class YouTubeAudioExtractor:
                     if not streams:
                         raise Exception("No audio streams found")
                     
-                    # Select the best quality stream
-                    stream = streams.get_highest_resolution()
+                    # Select the best quality stream for mobile
+                    # Prioritize smaller file sizes and mobile-friendly formats
+                    stream = None
+                    if preferred_format:
+                        stream = streams.filter(mime_type=f"audio/{preferred_format}").first()
+                    
+                    if not stream:
+                        # Try to get the smallest file size that's still good quality
+                        streams = sorted(streams, key=lambda x: x.filesize)
+                        for s in streams:
+                            if s.bitrate >= 128000:  # Minimum 128kbps for acceptable quality
+                                stream = s
+                                break
+                    
                     if not stream:
                         stream = streams.first()
                     
@@ -278,22 +354,44 @@ class YouTubeAudioExtractor:
                     # Build URL with parameters
                     stream_info.url += '&'.join(f"{k}={v}" for k, v in params.items())
                     
-                    # Create player URL with stream data
+                    # Create player URL with stream data and proxy information
                     current_dir = os.path.dirname(os.path.abspath(__file__))
-                    player_url = f"file://{os.path.join(current_dir, 'player.html')}?data=" + urllib.parse.quote(json.dumps({
+                    proxy_info = {
+                        'username': PROXY_USERNAME,
+                        'password': PROXY_PASSWORD,
+                        'host': PROXY_HOST,
+                        'port': PROXY_URL.split(':')[-1]
+                    } if SERVER_ENV and PROXY_URL else None
+                    
+                    # Download the audio file
+                    try:
+                        local_path = download_audio(youtube_url, proxy_info)
+                        print(f"Audio downloaded to: {local_path}")
+                        self._downloaded_files.add(local_path)  # Track the new file
+                    except Exception as e:
+                        print(f"Failed to download audio: {e}")
+                        local_path = None
+                    
+                    player_data = {
                         'url': stream_info.url,
+                        'local_path': local_path,
                         'title': stream_info.title,
                         'author': stream_info.author,
                         'format': stream_info.format,
                         'bitrate': stream_info.bitrate,
-                        'mime_type': stream_info.mime_type
-                    }))
+                        'mime_type': stream_info.mime_type,
+                        'proxy': proxy_info
+                    }
+                    
+                    player_url = f"file://{os.path.join(current_dir, 'player.html')}?data=" + urllib.parse.quote(json.dumps(player_data))
                     
                     return {
                         'status': 'success',
                         'message': 'Audio stream found',
                         'stream': stream_info,
-                        'player_url': player_url
+                        'player_url': player_url,
+                        'proxy_info': proxy_info,
+                        'local_path': local_path
                     }
                     
                 except Exception as e:
@@ -352,6 +450,12 @@ def main():
         print(f"Length: {stream.length} seconds")
         print(f"\nStream URL: {stream.url}")
         print(f"\nPlayer URL: {result['player_url']}")
+        if result['proxy_info']:
+            print("\nProxy Information:")
+            print(f"Username: {result['proxy_info']['username']}")
+            print(f"Password: {result['proxy_info']['password']}")
+            print(f"Host: {result['proxy_info']['host']}")
+            print(f"Port: {result['proxy_info']['port']}")
     else:
         print(f"Error: {result['message']}")
         sys.exit(1)

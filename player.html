@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Audio Player</title>
     <style>
         body {
@@ -8,91 +10,132 @@
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background: #f5f5f5;
+            background-color: #f5f5f5;
         }
         .player-container {
-            background: white;
+            background-color: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        audio {
+        .audio-player {
             width: 100%;
             margin: 20px 0;
         }
         .info {
-            margin: 20px 0;
+            margin: 10px 0;
+            color: #666;
+        }
+        .title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+        .author {
+            color: #666;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
             padding: 10px;
-            background: #f8f9fa;
+            background-color: #fff3f3;
             border-radius: 4px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
         }
     </style>
 </head>
 <body>
     <div class="player-container">
-        <h1>YouTube Audio Player</h1>
-        <div class="info">
-            <p><strong>Title:</strong> <span id="title"></span></p>
-            <p><strong>Author:</strong> <span id="author"></span></p>
-            <p><strong>Format:</strong> <span id="format"></span></p>
-            <p><strong>Bitrate:</strong> <span id="bitrate"></span></p>
-        </div>
-        <audio id="audioPlayer" controls>
-            Your browser does not support the audio element.
-        </audio>
+        <div id="player-info"></div>
+        <audio id="audio-player" class="audio-player" controls></audio>
+        <div id="status" class="status"></div>
     </div>
 
     <script>
-        // Get URL parameters
+        // Parse URL parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const streamData = JSON.parse(decodeURIComponent(urlParams.get('data') || '{}'));
-        
-        // Update player info
-        document.getElementById('title').textContent = streamData.title || 'Unknown Title';
-        document.getElementById('author').textContent = streamData.author || 'Unknown Author';
-        document.getElementById('format').textContent = streamData.format || 'Unknown Format';
-        document.getElementById('bitrate').textContent = streamData.bitrate || 'Unknown Bitrate';
-        
+        const data = JSON.parse(decodeURIComponent(urlParams.get('data')));
+
+        // Display video information
+        const playerInfo = document.getElementById('player-info');
+        playerInfo.innerHTML = `
+            <div class="title">${data.title}</div>
+            <div class="author">${data.author}</div>
+            <div class="info">Format: ${data.format} | Bitrate: ${data.bitrate}</div>
+        `;
+
         // Set up audio player
-        const audioPlayer = document.getElementById('audioPlayer');
+        const audioPlayer = document.getElementById('audio-player');
+        const statusDiv = document.getElementById('status');
         
-        // Create a MediaSource
-        const mediaSource = new MediaSource();
-        audioPlayer.src = URL.createObjectURL(mediaSource);
-        
-        mediaSource.addEventListener('sourceopen', () => {
-            const sourceBuffer = mediaSource.addSourceBuffer(streamData.mime_type);
+        if (data.local_path) {
+            // Use local file if available
+            audioPlayer.src = data.local_path;
             
-            // Fetch the audio stream with proper headers
-            fetch(streamData.url, {
+            // Handle cleanup after playback
+            audioPlayer.addEventListener('ended', () => {
+                cleanupFile(data.local_path);
+            });
+            
+            // Handle cleanup when leaving the page
+            window.addEventListener('beforeunload', () => {
+                cleanupFile(data.local_path);
+            });
+        } else {
+            // Fallback to direct URL if local file not available
+            audioPlayer.src = data.url;
+            playerInfo.innerHTML += '<div class="error">Warning: Using direct stream URL. Playback may not work.</div>';
+        }
+
+        function cleanupFile(filepath) {
+            // Extract filename from path
+            const filename = filepath.split('/').pop();
+            
+            // Send cleanup request to server
+            fetch('/api/cleanup', {
+                method: 'POST',
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',
-                    'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Range': 'bytes=0-',
-                    'Sec-Fetch-Mode': 'cors',
-                    'Sec-Fetch-Site': 'cross-site',
-                    'Sec-Fetch-Dest': 'audio',
-                    'Referer': 'https://www.youtube.com/',
-                    'Origin': 'https://www.youtube.com'
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filename: filename })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showStatus('File cleaned up successfully', 'success');
+                } else {
+                    showStatus('Failed to clean up file', 'error');
                 }
             })
-            .then(response => response.arrayBuffer())
-            .then(data => {
-                sourceBuffer.addEventListener('updateend', () => {
-                    if (!sourceBuffer.updating && mediaSource.readyState === 'open') {
-                        mediaSource.endOfStream();
-                    }
-                });
-                
-                sourceBuffer.appendBuffer(data);
-            })
             .catch(error => {
-                console.error('Error fetching audio:', error);
-                alert('Error loading audio stream. Please try again.');
+                showStatus('Error cleaning up file', 'error');
+                console.error('Cleanup error:', error);
             });
-        });
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            // Hide status after 3 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
     </script>
 </body>
 </html> 
