@@ -4,15 +4,18 @@ Configuration settings for the YouTube stream extractor
 
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file if it exists
+env_path = Path('.env')
+if env_path.exists():
+    load_dotenv()
 
-# Proxy settings
-PROXY_USERNAME = os.getenv('PROXY_USERNAME', '')
-PROXY_PASSWORD = os.getenv('PROXY_PASSWORD', '')
-PROXY_HOST = os.getenv('PROXY_HOST', '')
-PROXY_PORT = os.getenv('PROXY_PORT', '')
+# Proxy settings (all optional)
+PROXY_USERNAME = os.getenv('PROXY_USERNAME')
+PROXY_PASSWORD = os.getenv('PROXY_PASSWORD')
+PROXY_HOST = os.getenv('PROXY_HOST')
+PROXY_PORT = os.getenv('PROXY_PORT')
 
 # Construct proxy URLs only if all credentials are provided and non-empty
 PROXY_URL = None

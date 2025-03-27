@@ -176,7 +176,7 @@ class YouTubeAudioExtractor:
             yt = None
             
             # Set up proxy configuration
-            proxies = {}
+            proxies = None
             if SERVER_ENV and PROXY_URL:
                 proxies = {
                     'http': PROXY_URL,
@@ -194,7 +194,7 @@ class YouTubeAudioExtractor:
                         youtube_url,
                         use_oauth=False,
                         allow_oauth_cache=True,
-                        proxies=proxies if proxies else None
+                        proxies=proxies
                     )
                     yt.client = YOUTUBE_CLIENT
                     yt.headers = YOUTUBE_HEADERS
