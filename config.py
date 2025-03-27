@@ -87,6 +87,28 @@ YOUTUBE_HEADERS = {
     'X-YouTube-Device-OS-Version': '13'
 }
 
+# Video stream settings
+VIDEO_STREAM_SETTINGS = {
+    'range': '0-',
+    'redirector': '1',
+    'ipbits': '0',
+    'mh': 'DQ',
+    'mm': '31,29',
+    'ms': 'au,rdu',
+    'mv': 'm',
+    'pl': '49',
+    'rms': 'au,au',
+    'gcr': 'mx',
+    'vprv': '1',
+    'svpuc': '1',
+    'rqh': '1',
+    'gir': 'yes',
+    'keepalive': 'yes',
+    'txp': '4532434',
+    'fvip': '3',
+    'requiressl': 'yes'
+}
+
 # Video URL access settings
 VIDEO_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',

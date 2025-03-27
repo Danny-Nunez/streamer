@@ -15,7 +15,14 @@ import subprocess
 import json
 import os
 import time
-from config import PROXY_URL, SERVER_ENV, mark_proxy_failed, get_proxy_url, VIDEO_HEADERS
+from config import (
+    PROXY_URL, 
+    SERVER_ENV, 
+    mark_proxy_failed, 
+    get_proxy_url, 
+    VIDEO_STREAM_SETTINGS,
+    YOUTUBE_CLIENT
+)
 
 @dataclass
 class AudioStream:
@@ -240,18 +247,23 @@ class YouTubeAudioExtractor:
                         length=yt.length
                     )
                     
-                    # Add headers to the URL
+                    # Add necessary parameters to the URL
                     if '?' in stream_info.url:
                         stream_info.url += '&'
                     else:
                         stream_info.url += '?'
                     
-                    # Add headers as URL parameters
-                    for key, value in VIDEO_HEADERS.items():
-                        stream_info.url += f"{key}={value}&"
+                    # Add required parameters for video access
+                    params = VIDEO_STREAM_SETTINGS.copy()
+                    params['c'] = YOUTUBE_CLIENT
                     
-                    # Remove trailing '&'
-                    stream_info.url = stream_info.url.rstrip('&')
+                    # Add proxy IP if available
+                    if SERVER_ENV and PROXY_URL:
+                        proxy_ip = PROXY_URL.split('@')[1].split(':')[0]
+                        params['ip'] = proxy_ip
+                    
+                    # Build URL with parameters
+                    stream_info.url += '&'.join(f"{k}={v}" for k, v in params.items())
                     
                     return {
                         'status': 'success',
