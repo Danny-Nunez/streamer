@@ -23,7 +23,7 @@ if all([PROXY_USERNAME, PROXY_PASSWORD, PROXY_HOST, PROXY_PORT]):
     PROXY_URL = f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@{PROXY_HOST}:{PROXY_PORT}"
 
 # Environment settings
-SERVER_ENV = os.getenv('SERVER_ENV', 'false').lower() == 'true'
+SERVER_ENV = False  # Force local environment for testing
 
 # YouTube settings
 YOUTUBE_CLIENT = 'ANDROID'  # Use ANDROID client for better compatibility

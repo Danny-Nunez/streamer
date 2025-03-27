@@ -15,9 +15,7 @@ import subprocess
 import json
 import os
 import time
-import random
-import base64
-from config import PROXY_URL, SERVER_ENV, YOUTUBE_CLIENT, YOUTUBE_HEADERS
+from config import PROXY_URL, SERVER_ENV
 
 @dataclass
 class AudioStream:
@@ -44,7 +42,7 @@ def cmd(command: str, check: bool = True, shell: bool = True, capture_output: bo
         raise
 
 def generate_youtube_token() -> dict:
-    """Generate YouTube token using Node.js script"""
+    """Generate YouTube token using youtube-po-token-generator"""
     print("Generating YouTube token")
     current_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(current_dir, 'scripts', 'test_token.js')
@@ -53,19 +51,33 @@ def generate_youtube_token() -> dict:
     env = os.environ.copy()
     env['NODE_PATH'] = node_modules_path
     env['HOME'] = current_dir  # Set HOME to current directory for npm
+    
+    # Set proxy if configured
+    if SERVER_ENV and PROXY_URL:
+        env['HTTPS_PROXY'] = PROXY_URL
+        print(f"Using proxy: {PROXY_URL}")
+    
     try:
         result = cmd(f"node {script_path}", env=env)
         if result.returncode != 0:
             raise Exception(f"Token generation failed with exit code {result.returncode}")
         
-        # Read the token from the saved file
+        # Parse the token data from stdout
+        token_data = json.loads(result.stdout)
+        print(f"Token generation result: {token_data}")
+        
+        if 'visitorData' not in token_data or 'poToken' not in token_data:
+            raise Exception("Invalid token data format")
+            
+        # Save token to file for caching
         token_path = os.path.join(current_dir, 'token.json')
-        with open(token_path, 'r') as f:
-            data = json.load(f)
-            print(f"Token generation result: {data}")
-            if 'visitorData' not in data or 'poToken' not in data:
-                raise Exception("Invalid token data format")
-            return data
+        with open(token_path, 'w') as f:
+            json.dump({
+                **token_data,
+                'timestamp': int(time.time() * 1000)
+            }, f)
+            
+        return token_data
     except Exception as e:
         print(f"Error generating token: {e}")
         raise
@@ -84,7 +96,10 @@ def po_token_verifier() -> Tuple[str, str]:
                     print("Using saved token data")
                     print(f"Visitor Data: {token_data['visitorData']}")
                     print(f"PoToken: {token_data['poToken']}")
-                    return token_data['visitorData'], token_data['poToken']
+                    # Ensure tokens are properly URL encoded
+                    visitor_data = token_data['visitorData']
+                    po_token = token_data['poToken']
+                    return visitor_data, po_token
         
         # If no valid saved token, generate a new one
         print("Generating new token")
@@ -92,14 +107,13 @@ def po_token_verifier() -> Tuple[str, str]:
         print(f"Generated new token data:")
         print(f"Visitor Data: {token_object['visitorData']}")
         print(f"PoToken: {token_object['poToken']}")
-        return token_object["visitorData"], token_object["poToken"]
+        # Ensure tokens are properly URL encoded
+        visitor_data = token_object['visitorData']
+        po_token = token_object['poToken']
+        return visitor_data, po_token
     except Exception as e:
         print(f"Error in po_token_verifier: {e}")
-        # Return a fallback token if generation fails
-        timestamp = int(time.time() * 1000)
-        random_value = random.randint(0, 1000000)
-        visitor_data = base64.b64encode(f"{timestamp}.{random_value}".encode()).decode()
-        return visitor_data, ""
+        raise
 
 class YouTubeAudioExtractor:
     def __init__(self):
@@ -163,16 +177,6 @@ class YouTubeAudioExtractor:
 
             print(f"Processing video ID: {video_id}")
             
-            # Clear the token cache first
-            cache_dir = os.path.expanduser('~/.cache/pytubefix')
-            if os.path.exists(cache_dir):
-                print(f"Clearing cache directory: {cache_dir}")
-                import shutil
-                shutil.rmtree(cache_dir)
-            
-            audio_streams = None
-            yt = None
-            
             # Set up proxy configuration
             proxies = None
             if SERVER_ENV and PROXY_URL:
@@ -187,85 +191,19 @@ class YouTubeAudioExtractor:
             # Get visitor data and poToken
             visitor_data, po_token = po_token_verifier()
             
-            # On server, always use ANDROID client
-            if SERVER_ENV:
-                try:
-                    print("Server environment detected, using ANDROID client...")
-                    yt = pytubefix.YouTube(
-                        youtube_url,
-                        use_oauth=False,
-                        allow_oauth_cache=True,
-                        proxies=proxies,
-                        use_po_token=True  # Enable po_token usage
-                    )
-                    yt.client = YOUTUBE_CLIENT
-                    yt.headers = {
-                        **YOUTUBE_HEADERS,
-                        'X-YouTube-Client-Name': '1',
-                        'X-YouTube-Client-Version': '2.20240229.01.00',
-                        'X-YouTube-Device': 'android',
-                        'X-YouTube-Device-Make': 'Samsung',
-                        'X-YouTube-Device-Model': 'SM-S908B',
-                        'X-YouTube-Device-OS': 'Android',
-                        'X-YouTube-Device-OS-Version': '13',
-                        'X-YouTube-Identity-Token': po_token,
-                        'X-YouTube-Visitor-Data': visitor_data
-                    }
-                    
-                    print(f"Using client: {yt.client}")
-                    print(f"Using headers: {yt.headers}")
-                    audio_streams = yt.streams.filter(only_audio=True)
-                    if audio_streams:
-                        print(f"Found {len(audio_streams)} audio streams with ANDROID client")
-                    else:
-                        print("No audio streams found with ANDROID client")
-                except Exception as e:
-                    print(f"Error getting audio streams with ANDROID client: {e}")
-                    return {
-                        'status': 'error',
-                        'message': str(e),
-                        'stream': None
-                    }
-            else:
-                # Local environment: try different clients
-                client_types = ['ANDROID', 'IOS', 'WEB']
-                for client_type in client_types:
-                    try:
-                        print(f"Attempting to get audio streams with {client_type} client...")
-                        yt = pytubefix.YouTube(
-                            youtube_url,
-                            use_oauth=False,
-                            allow_oauth_cache=True,
-                            proxies=proxies if proxies else None,
-                            use_po_token=True  # Enable po_token usage
-                        )
-                        yt.client = client_type
-                        yt.headers = {
-                            **YOUTUBE_HEADERS,
-                            'X-YouTube-Client-Name': '1',
-                            'X-YouTube-Client-Version': '2.20240229.01.00',
-                            'X-YouTube-Device': 'android',
-                            'X-YouTube-Device-Make': 'Samsung',
-                            'X-YouTube-Device-Model': 'SM-S908B',
-                            'X-YouTube-Device-OS': 'Android',
-                            'X-YouTube-Device-OS-Version': '13',
-                            'X-YouTube-Identity-Token': po_token,
-                            'X-YouTube-Visitor-Data': visitor_data
-                        }
-                        
-                        print(f"Using client: {yt.client}")
-                        print(f"Using headers: {yt.headers}")
-                        audio_streams = yt.streams.filter(only_audio=True)
-                        if audio_streams:
-                            print(f"Found {len(audio_streams)} audio streams with {client_type} client")
-                            break
-                        else:
-                            print(f"No audio streams found with {client_type} client")
-                    except Exception as e:
-                        print(f"Error getting audio streams with {client_type} client: {e}")
-                        continue
+            # Create YouTube object with ANDROID client
+            yt = pytubefix.YouTube(
+                youtube_url,
+                client='ANDROID',  # Use ANDROID client which doesn't require po_token
+                use_oauth=False,
+                allow_oauth_cache=True,
+                proxies=proxies if proxies else None,
+                use_po_token=False  # Disable po_token for ANDROID client
+            )
             
-            if not audio_streams or not yt:
+            # Get audio streams
+            audio_streams = yt.streams.filter(only_audio=True)
+            if not audio_streams:
                 return {
                     'status': 'error',
                     'message': 'No audio streams found',
