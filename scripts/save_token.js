@@ -6,7 +6,7 @@ async function saveToken() {
     let browser = null;
     try {
         browser = await puppeteer.launch({
-            headless: true,
+            headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
 
@@ -19,7 +19,7 @@ async function saveToken() {
         // Navigate to YouTube
         await page.goto('https://www.youtube.com', {
             waitUntil: 'networkidle0',
-            timeout: 30000
+            timeout: 60000
         });
 
         // Get cookies and visitor data
@@ -29,7 +29,7 @@ async function saveToken() {
         // Navigate to a video page
         await page.goto('https://www.youtube.com/watch?v=dQw4w9WgXcQ', {
             waitUntil: 'networkidle0',
-            timeout: 30000
+            timeout: 60000
         });
 
         // Wait for the page to load and get the PoToken
@@ -43,7 +43,7 @@ async function saveToken() {
                 }
             }
             return null;
-        }, { timeout: 10000 });
+        }, { timeout: 30000 });
 
         // Extract PoToken from page content
         const pageContent = await page.content();

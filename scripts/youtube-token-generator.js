@@ -29,7 +29,7 @@ async function generateToken() {
     let browser = null;
     try {
         browser = await puppeteer.launch({
-            headless: true,
+            headless: "new",
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
@@ -43,7 +43,7 @@ async function generateToken() {
         // Navigate to YouTube
         await page.goto('https://www.youtube.com', {
             waitUntil: 'networkidle0',
-            timeout: 30000
+            timeout: 60000
         });
 
         // Get cookies and visitor data
@@ -53,7 +53,7 @@ async function generateToken() {
         // Navigate to a video page
         await page.goto('https://www.youtube.com/watch?v=dQw4w9WgXcQ', {
             waitUntil: 'networkidle0',
-            timeout: 30000
+            timeout: 60000
         });
 
         // Wait for the page to load and get the PoToken
@@ -67,7 +67,7 @@ async function generateToken() {
                 }
             }
             return null;
-        }, { timeout: 10000 });
+        }, { timeout: 30000 });
 
         // Extract PoToken from page content
         const pageContent = await page.content();
