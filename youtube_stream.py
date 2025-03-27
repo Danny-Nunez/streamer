@@ -45,7 +45,7 @@ def cmd(command: str, check: bool = True, shell: bool = True, capture_output: bo
 def generate_youtube_token() -> dict:
     """Generate YouTube token using Node.js script"""
     print("Generating YouTube token")
-    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'youtube-token-generator.js')
+    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'save_token.js')
     # Use absolute path for node_modules
     node_modules_path = os.path.join(os.path.dirname(__file__), 'node_modules')
     env = os.environ.copy()
@@ -53,13 +53,17 @@ def generate_youtube_token() -> dict:
     env['HOME'] = '/app'  # Set HOME to /app for npm
     try:
         result = cmd(f"node {script_path}", env=env)
-        data = json.loads(result.stdout)
-        print(f"Token generation result: {data}")
-        if 'error' in data:
-            raise Exception(f"Token generation failed: {data['error']}")
-        if 'visitorData' not in data or 'poToken' not in data:
-            raise Exception("Invalid token data format")
-        return data
+        if result.returncode != 0:
+            raise Exception(f"Token generation failed with exit code {result.returncode}")
+        
+        # Read the token from the saved file
+        token_path = os.path.join(os.path.dirname(__file__), 'token.json')
+        with open(token_path, 'r') as f:
+            data = json.load(f)
+            print(f"Token generation result: {data}")
+            if 'visitorData' not in data or 'signature' not in data:
+                raise Exception("Invalid token data format")
+            return data
     except Exception as e:
         print(f"Error generating token: {e}")
         raise
@@ -67,8 +71,20 @@ def generate_youtube_token() -> dict:
 def po_token_verifier() -> Tuple[str, str]:
     """Get visitor data and PoToken for YouTube"""
     try:
+        # Try to load saved token first
+        token_path = os.path.join(os.path.dirname(__file__), 'token.json')
+        if os.path.exists(token_path):
+            with open(token_path, 'r') as f:
+                token_data = json.load(f)
+                # Check if token is less than 1 hour old
+                if time.time() * 1000 - token_data['timestamp'] < 3600000:
+                    print("Using saved token data")
+                    return token_data['visitorData'], token_data['signature']
+        
+        # If no valid saved token, generate a new one
+        print("Generating new token")
         token_object = generate_youtube_token()
-        return token_object["visitorData"], token_object["poToken"]
+        return token_object["visitorData"], token_object["signature"]
     except Exception as e:
         print(f"Error in po_token_verifier: {e}")
         # Return a fallback token if generation fails
