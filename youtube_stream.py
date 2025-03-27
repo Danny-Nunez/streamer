@@ -195,7 +195,8 @@ class YouTubeAudioExtractor:
                         youtube_url,
                         use_oauth=False,
                         allow_oauth_cache=True,
-                        proxies=proxies
+                        proxies=proxies,
+                        use_po_token=True  # Enable po_token usage
                     )
                     yt.client = YOUTUBE_CLIENT
                     yt.headers = {
@@ -235,22 +236,21 @@ class YouTubeAudioExtractor:
                             youtube_url,
                             use_oauth=False,
                             allow_oauth_cache=True,
-                            proxies=proxies if proxies else None
+                            proxies=proxies if proxies else None,
+                            use_po_token=True  # Enable po_token usage
                         )
                         yt.client = client_type
                         yt.headers = {
-                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                            'Accept-Language': 'en-US,en;q=0.9',
-                            'Accept-Encoding': 'gzip, deflate, br',
-                            'Sec-Fetch-Mode': 'navigate',
-                            'Sec-Fetch-Site': 'none',
-                            'Sec-Fetch-User': '?1',
-                            'Sec-Fetch-Dest': 'document',
-                            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                            'Sec-Ch-Ua-Mobile': '?0',
-                            'Sec-Ch-Ua-Platform': '"macOS"',
-                            'Upgrade-Insecure-Requests': '1'
+                            **YOUTUBE_HEADERS,
+                            'X-YouTube-Client-Name': '1',
+                            'X-YouTube-Client-Version': '2.20240229.01.00',
+                            'X-YouTube-Device': 'android',
+                            'X-YouTube-Device-Make': 'Samsung',
+                            'X-YouTube-Device-Model': 'SM-S908B',
+                            'X-YouTube-Device-OS': 'Android',
+                            'X-YouTube-Device-OS-Version': '13',
+                            'X-YouTube-Identity-Token': po_token,
+                            'X-YouTube-Visitor-Data': visitor_data
                         }
                         
                         print(f"Using client: {yt.client}")

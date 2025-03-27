@@ -39,5 +39,12 @@ YOUTUBE_HEADERS = {
     'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
     'Sec-Ch-Ua-Mobile': '?1',
     'Sec-Ch-Ua-Platform': '"Android"',
-    'Upgrade-Insecure-Requests': '1'
+    'Upgrade-Insecure-Requests': '1',
+    'X-YouTube-Client-Name': '1',
+    'X-YouTube-Client-Version': '2.20240229.01.00',
+    'X-YouTube-Device': 'android',
+    'X-YouTube-Device-Make': 'Samsung',
+    'X-YouTube-Device-Model': 'SM-S908B',
+    'X-YouTube-Device-OS': 'Android',
+    'X-YouTube-Device-OS-Version': '13'
 } 
