@@ -93,20 +93,24 @@ VIDEO_STREAM_SETTINGS = {
     'redirector': '1',
     'ipbits': '0',
     'mh': 'DQ',
-    'mm': '31,29',
-    'ms': 'au,rdu',
+    'mm': '31,26',
+    'mn': 'sn-pmcg-4vgl,sn-gpv7kne7',
+    'ms': 'au,onr',
     'mv': 'm',
-    'pl': '49',
+    'mvi': '12',
+    'pl': '24',
     'rms': 'au,au',
-    'gcr': 'mx',
+    'gcr': 'br',
     'vprv': '1',
     'svpuc': '1',
     'rqh': '1',
     'gir': 'yes',
     'keepalive': 'yes',
     'txp': '4532434',
-    'fvip': '3',
-    'requiressl': 'yes'
+    'fvip': '5',
+    'requiressl': 'yes',
+    'initcwndbps': '2036250',
+    'xpc': 'EgVo2aDSNQ=='
 }
 
 # Video URL access settings
