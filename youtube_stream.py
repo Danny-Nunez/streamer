@@ -77,7 +77,12 @@ def generate_youtube_token() -> dict:
         
         # Parse the token data from stdout
         try:
-            token_data = json.loads(result.stdout)
+            # Clean the output to ensure we only have the JSON data
+            output = result.stdout.strip()
+            if not output:
+                raise Exception("No output received from token generator")
+                
+            token_data = json.loads(output)
             print(f"Token generation result: {token_data}")
         except json.JSONDecodeError as e:
             print(f"Failed to parse token data: {e}")
