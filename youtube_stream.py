@@ -14,6 +14,9 @@ from datetime import datetime
 import subprocess
 import json
 import os
+import time
+import random
+import base64
 
 @dataclass
 class AudioStream:
@@ -52,15 +55,27 @@ def generate_youtube_token() -> dict:
         result = cmd(f"node {script_path}", env=env)
         data = json.loads(result.stdout)
         print(f"Token generation result: {data}")
+        if 'error' in data:
+            raise Exception(f"Token generation failed: {data['error']}")
+        if 'visitorData' not in data or 'poToken' not in data:
+            raise Exception("Invalid token data format")
         return data
     except Exception as e:
         print(f"Error generating token: {e}")
-        return {"error": str(e)}
+        raise
 
 def po_token_verifier() -> Tuple[str, str]:
     """Get visitor data and PoToken for YouTube"""
-    token_object = generate_youtube_token()
-    return token_object["visitorData"], token_object["poToken"]
+    try:
+        token_object = generate_youtube_token()
+        return token_object["visitorData"], token_object["poToken"]
+    except Exception as e:
+        print(f"Error in po_token_verifier: {e}")
+        # Return a fallback token if generation fails
+        timestamp = int(time.time() * 1000)
+        random = random.randint(0, 1000000)
+        visitor_data = base64.b64encode(f"{timestamp}.{random}".encode()).decode()
+        return visitor_data, ""
 
 class YouTubeAudioExtractor:
     def __init__(self):
@@ -136,8 +151,15 @@ class YouTubeAudioExtractor:
             # Set client to WEB
             yt.client = 'WEB'
             
-            # Get all audio streams
-            audio_streams = yt.streams.filter(only_audio=True)
+            try:
+                # Get all audio streams
+                audio_streams = yt.streams.filter(only_audio=True)
+            except Exception as e:
+                print(f"Error getting audio streams: {e}")
+                # Try without PoToken if it fails
+                yt = pytubefix.YouTube(youtube_url, use_oauth=False, allow_oauth_cache=True)
+                yt.client = 'WEB'
+                audio_streams = yt.streams.filter(only_audio=True)
             
             if not audio_streams:
                 return {
