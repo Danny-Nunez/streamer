@@ -46,6 +46,11 @@ def generate_youtube_token() -> dict:
     print("Generating YouTube token")
     current_dir = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(current_dir, 'scripts', 'test_token.js')
+    
+    # Ensure we're in the correct directory
+    os.chdir(current_dir)
+    print(f"Working directory: {os.getcwd()}")
+    
     # Use absolute path for node_modules
     node_modules_path = os.path.join(current_dir, 'node_modules')
     env = os.environ.copy()
@@ -60,16 +65,24 @@ def generate_youtube_token() -> dict:
     
     try:
         # First ensure the package is installed
+        print("Installing youtube-po-token-generator...")
         cmd(f"npm install youtube-po-token-generator --prefix {current_dir}", env=env)
         
         # Run the token generator script
+        print("Running token generator script...")
         result = cmd(f"node {script_path}", env=env)
+        
         if result.returncode != 0:
             raise Exception(f"Token generation failed with exit code {result.returncode}")
         
         # Parse the token data from stdout
-        token_data = json.loads(result.stdout)
-        print(f"Token generation result: {token_data}")
+        try:
+            token_data = json.loads(result.stdout)
+            print(f"Token generation result: {token_data}")
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse token data: {e}")
+            print(f"Raw output: {result.stdout}")
+            raise Exception("Invalid token data format")
         
         if 'visitorData' not in token_data or 'poToken' not in token_data:
             raise Exception("Invalid token data format")
