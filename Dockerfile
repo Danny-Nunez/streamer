@@ -4,6 +4,17 @@ FROM nikolaik/python-nodejs:python3.11-nodejs20-slim
 # Set working directory
 WORKDIR /app
 
+# Install Puppeteer dependencies
+RUN apt-get update && apt-get install -y \
+    chromium \
+    libgbm-dev \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Puppeteer environment variables
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 # Create a non-root user with a different UID
 RUN useradd -m -u 1001 appuser && \
     mkdir -p /app && \
