@@ -23,6 +23,7 @@ from config import (
     VIDEO_STREAM_SETTINGS,
     YOUTUBE_CLIENT
 )
+import urllib.parse
 
 @dataclass
 class AudioStream:
@@ -277,10 +278,22 @@ class YouTubeAudioExtractor:
                     # Build URL with parameters
                     stream_info.url += '&'.join(f"{k}={v}" for k, v in params.items())
                     
+                    # Create player URL with stream data
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    player_url = f"file://{os.path.join(current_dir, 'player.html')}?data=" + urllib.parse.quote(json.dumps({
+                        'url': stream_info.url,
+                        'title': stream_info.title,
+                        'author': stream_info.author,
+                        'format': stream_info.format,
+                        'bitrate': stream_info.bitrate,
+                        'mime_type': stream_info.mime_type
+                    }))
+                    
                     return {
                         'status': 'success',
                         'message': 'Audio stream found',
-                        'stream': stream_info
+                        'stream': stream_info,
+                        'player_url': player_url
                     }
                     
                 except Exception as e:
@@ -338,6 +351,7 @@ def main():
         print(f"File Size: {stream.filesize / 1024 / 1024:.2f} MB")
         print(f"Length: {stream.length} seconds")
         print(f"\nStream URL: {stream.url}")
+        print(f"\nPlayer URL: {result['player_url']}")
     else:
         print(f"Error: {result['message']}")
         sys.exit(1)
