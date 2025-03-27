@@ -47,7 +47,7 @@ def generate_youtube_token() -> dict:
     """Generate YouTube token using Node.js script"""
     print("Generating YouTube token")
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    script_path = os.path.join(current_dir, 'scripts', 'save_token.js')
+    script_path = os.path.join(current_dir, 'scripts', 'test_token.js')
     # Use absolute path for node_modules
     node_modules_path = os.path.join(current_dir, 'node_modules')
     env = os.environ.copy()
@@ -63,7 +63,7 @@ def generate_youtube_token() -> dict:
         with open(token_path, 'r') as f:
             data = json.load(f)
             print(f"Token generation result: {data}")
-            if 'visitorData' not in data or 'signatureTimestamp' not in data:
+            if 'visitorData' not in data or 'poToken' not in data:
                 raise Exception("Invalid token data format")
             return data
     except Exception as e:
@@ -83,18 +83,16 @@ def po_token_verifier() -> Tuple[str, str]:
                 if time.time() * 1000 - token_data['timestamp'] < 3600000:
                     print("Using saved token data")
                     print(f"Visitor Data: {token_data['visitorData']}")
-                    print(f"PoToken: {token_data['signatureTimestamp']}")
-                    # Return visitor data and signatureTimestamp as PoToken
-                    return token_data['visitorData'], token_data['signatureTimestamp']
+                    print(f"PoToken: {token_data['poToken']}")
+                    return token_data['visitorData'], token_data['poToken']
         
         # If no valid saved token, generate a new one
         print("Generating new token")
         token_object = generate_youtube_token()
         print(f"Generated new token data:")
         print(f"Visitor Data: {token_object['visitorData']}")
-        print(f"PoToken: {token_object['signatureTimestamp']}")
-        # Return visitor data and signatureTimestamp as PoToken
-        return token_object["visitorData"], token_object["signatureTimestamp"]
+        print(f"PoToken: {token_object['poToken']}")
+        return token_object["visitorData"], token_object["poToken"]
     except Exception as e:
         print(f"Error in po_token_verifier: {e}")
         # Return a fallback token if generation fails
@@ -186,6 +184,9 @@ class YouTubeAudioExtractor:
             else:
                 print("No proxy configuration found, proceeding without proxy")
             
+            # Get visitor data and poToken
+            visitor_data, po_token = po_token_verifier()
+            
             # On server, always use ANDROID client
             if SERVER_ENV:
                 try:
@@ -197,7 +198,18 @@ class YouTubeAudioExtractor:
                         proxies=proxies
                     )
                     yt.client = YOUTUBE_CLIENT
-                    yt.headers = YOUTUBE_HEADERS
+                    yt.headers = {
+                        **YOUTUBE_HEADERS,
+                        'X-YouTube-Client-Name': '1',
+                        'X-YouTube-Client-Version': '2.20240229.01.00',
+                        'X-YouTube-Device': 'android',
+                        'X-YouTube-Device-Make': 'Samsung',
+                        'X-YouTube-Device-Model': 'SM-S908B',
+                        'X-YouTube-Device-OS': 'Android',
+                        'X-YouTube-Device-OS-Version': '13',
+                        'X-YouTube-Identity-Token': po_token,
+                        'X-YouTube-Visitor-Data': visitor_data
+                    }
                     
                     print(f"Using client: {yt.client}")
                     print(f"Using headers: {yt.headers}")
