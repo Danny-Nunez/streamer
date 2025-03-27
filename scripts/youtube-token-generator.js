@@ -31,61 +31,88 @@ async function generateToken() {
         browser = await puppeteer.launch({
             headless: "new",
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--window-size=1280,720'
+            ]
         });
 
         const page = await browser.newPage();
         
+        // Block unnecessary resources
+        await page.setRequestInterception(true);
+        page.on('request', (request) => {
+            const resourceType = request.resourceType();
+            if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+                request.abort();
+            } else {
+                request.continue();
+            }
+        });
+
         // Set viewport and user agent
         await page.setViewport({ width: 1280, height: 720 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
+        console.log('Navigating to YouTube...');
         // Navigate to YouTube
         await page.goto('https://www.youtube.com', {
-            waitUntil: 'networkidle0',
+            waitUntil: 'networkidle2',
             timeout: 60000
         });
 
         // Get cookies and visitor data
         const cookies = await page.cookies();
         const visitorData = cookies.find(cookie => cookie.name === 'VISITOR_INFO1_LIVE')?.value || '';
+        console.log('Got visitor data:', visitorData);
 
+        console.log('Navigating to video page...');
         // Navigate to a video page
         await page.goto('https://www.youtube.com/watch?v=dQw4w9WgXcQ', {
-            waitUntil: 'networkidle0',
+            waitUntil: 'networkidle2',
             timeout: 60000
         });
 
-        // Wait for the page to load and get the PoToken
-        await page.waitForFunction(() => {
-            const scripts = document.getElementsByTagName('script');
-            for (const script of scripts) {
-                const content = script.textContent;
-                if (content && content.includes('"poToken"')) {
-                    const match = content.match(/"poToken":"([^"]+)"/);
-                    return match ? match[1] : null;
-                }
+        console.log('Waiting for page content...');
+        // Wait for some content to load
+        await page.waitForSelector('script', { timeout: 30000 });
+
+        // Extract PoToken using page evaluation
+        const poToken = await page.evaluate(() => {
+            const ytcfg = window.ytcfg?.get?.('ID_TOKEN');
+            if (ytcfg) return ytcfg;
+
+            // Try alternative method
+            for (const script of document.getElementsByTagName('script')) {
+                const content = script.textContent || '';
+                const match = content.match(/"ID_TOKEN":"([^"]+)"/);
+                if (match) return match[1];
+                
+                const poMatch = content.match(/"poToken":"([^"]+)"/);
+                if (poMatch) return poMatch[1];
             }
             return null;
-        }, { timeout: 30000 });
+        });
 
-        // Extract PoToken from page content
-        const pageContent = await page.content();
-        const poTokenMatch = pageContent.match(/"poToken":"([^"]+)"/);
-        
-        if (!poTokenMatch) {
+        if (!poToken) {
             throw new Error('PoToken not found in page content');
         }
 
+        console.log('Found PoToken');
         const tokenData = {
             visitorData,
-            poToken: poTokenMatch[1],
+            poToken,
             timestamp: Date.now()
         };
 
         // Save the new token
         const tokenPath = path.join(__dirname, '..', 'token.json');
         fs.writeFileSync(tokenPath, JSON.stringify(tokenData, null, 2));
+        console.log('Token data:', tokenData);
 
         return tokenData;
     } catch (error) {

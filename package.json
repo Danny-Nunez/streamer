@@ -4,7 +4,11 @@
   "description": "YouTube audio stream extractor",
   "main": "scripts/youtube-token-generator.js",
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.5",
     "axios": "^1.6.7",
-    "puppeteer": "^21.7.0"
+    "chromium": "^3.0.3",
+    "puppeteer": "^21.11.0",
+    "puppeteer-core": "^24.4.0",
+    "youtube-po-token-generator": "^0.4.0"
   }
 }
