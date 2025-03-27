@@ -8,9 +8,12 @@ Returns audio stream information including URL, format, and quality.
 
 import sys
 import pytubefix
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Tuple
 from dataclasses import dataclass
 from datetime import datetime
+import subprocess
+import json
+import os
 
 @dataclass
 class AudioStream:
@@ -23,6 +26,33 @@ class AudioStream:
     author: str
     length: int
 
+def cmd(command: str, check: bool = True, shell: bool = True, capture_output: bool = True, text: bool = True):
+    """
+    Runs a command in a shell, and throws an exception if the return code is non-zero.
+    """
+    print(f"Running command: {command}")
+    try:
+        return subprocess.run(command, check=check, shell=shell, capture_output=capture_output, text=text)
+    except subprocess.CalledProcessError as error:
+        print(f"Command failed with exit code: {error.returncode}")
+        print(f"stdout: {error.stdout}")
+        print(f"stderr: {error.stderr}")
+        raise
+
+def generate_youtube_token() -> dict:
+    """Generate YouTube token using Node.js script"""
+    print("Generating YouTube token")
+    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'youtube-token-generator.js')
+    result = cmd(f"node {script_path}")
+    data = json.loads(result.stdout)
+    print(f"Token generation result: {data}")
+    return data
+
+def po_token_verifier() -> Tuple[str, str]:
+    """Get visitor data and PoToken for YouTube"""
+    token_object = generate_youtube_token()
+    return token_object["visitorData"], token_object["poToken"]
+
 class YouTubeAudioExtractor:
     def __init__(self):
         self.node_installed = self._check_node_installed()
@@ -30,10 +60,9 @@ class YouTubeAudioExtractor:
     def _check_node_installed(self):
         """Check if Node.js is installed"""
         try:
-            import subprocess
-            subprocess.run(['node', '--version'], capture_output=True, check=True)
+            cmd('node --version')
             # Install dependencies if node is installed
-            subprocess.run(['npm', 'install'], capture_output=True, check=True)
+            cmd('npm install')
             return True
         except:
             return False
@@ -52,44 +81,6 @@ class YouTubeAudioExtractor:
                 return match.group(1)
         return None
 
-    def _get_po_token(self, video_id):
-        """Get PO token using Node.js helper"""
-        if not self.node_installed:
-            print("Node.js is not installed or not accessible")
-            return None, None
-        
-        try:
-            import subprocess
-            import json
-            
-            print(f"Attempting to get PoToken for video ID: {video_id}")
-            result = subprocess.run(
-                ['node', 'po_token_helper.js', video_id],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            print(f"Node.js output: {result.stdout}")
-            print(f"Node.js error output: {result.stderr}")
-            
-            try:
-                response = json.loads(result.stdout)
-                token = response.get('token')
-                visitor_data = response.get('visitorData')
-                print(f"Successfully got token: {token[:10]}... and visitor data: {visitor_data[:10]}...")
-                return token, visitor_data
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse JSON response: {e}")
-                return None, None
-        except subprocess.CalledProcessError as e:
-            print(f"Node.js process failed: {e}")
-            print(f"Error output: {e.stderr}")
-            return None, None
-        except Exception as e:
-            print(f"Unexpected error in _get_po_token: {e}")
-            return None, None
-
     def get_audio_stream(self, youtube_url: str, preferred_format: str = None) -> Union[Dict, None]:
         """
         Get audio stream information from a YouTube URL.
@@ -107,7 +98,7 @@ class YouTubeAudioExtractor:
             }
         """
         try:
-            # Get video ID and PO token
+            # Get video ID
             video_id = self._get_video_id(youtube_url)
             if not video_id:
                 return {
@@ -118,31 +109,18 @@ class YouTubeAudioExtractor:
 
             print(f"Processing video ID: {video_id}")
             
-            # Get PO token and visitor data
-            po_token, visitor_data = self._get_po_token(video_id)
-            
-            if not po_token or not visitor_data:
-                print("Failed to get PoToken or visitor data")
-            
             # Create a YouTube object with WEB client and PoToken
             yt = pytubefix.YouTube(
                 youtube_url,
                 use_oauth=False,
                 allow_oauth_cache=True,
-                use_po_token=True if po_token else False
+                use_po_token=True,
+                po_token_verifier=po_token_verifier
             )
             yt.use_oauth = False  # Ensure OAuth is disabled
             
             # Set client to WEB
             yt.client = 'WEB'
-            
-            # If we have PoToken and visitor data, set them
-            if po_token and visitor_data:
-                print("Setting PoToken and visitor data on YouTube object")
-                yt.po_token = po_token
-                yt.visitor_data = visitor_data
-            else:
-                print("No PoToken or visitor data available")
             
             # Get all audio streams
             audio_streams = yt.streams.filter(only_audio=True)
@@ -193,6 +171,7 @@ class YouTubeAudioExtractor:
             }
 
         except Exception as e:
+            print(f"Error in get_audio_stream: {str(e)}")
             return {
                 'status': 'error',
                 'message': str(e),
