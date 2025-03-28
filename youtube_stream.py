@@ -170,11 +170,11 @@ def download_audio(url: str, proxy_info: dict = None) -> str:
         # Set up proxy if provided
         proxies = None
         if proxy_info:
-            proxy_url = f"http://{proxy_info['username']}:{proxy_info['password']}@{proxy_info['host']}:{proxy_info['port']}"
-            proxies = {
-                'http': proxy_url,
-                'https': proxy_url
-            }
+            # Extract proxy components from the proxy URL
+            proxy_url = proxy_info.get('http', '')
+            if proxy_url:
+                # The proxy URL is already in the format http://username:password@host:port
+                proxies = proxy_info
         
         # Create a YouTube object with the URL
         yt = pytubefix.YouTube(
@@ -425,13 +425,6 @@ def main():
         print(f"File Size: {stream.filesize / 1024 / 1024:.2f} MB")
         print(f"Length: {stream.length} seconds")
         print(f"\nStream URL: {stream.url}")
-        print(f"\nPlayer URL: {result['player_url']}")
-        if result['proxy_info']:
-            print("\nProxy Information:")
-            print(f"Username: {result['proxy_info']['username']}")
-            print(f"Password: {result['proxy_info']['password']}")
-            print(f"Host: {result['proxy_info']['host']}")
-            print(f"Port: {result['proxy_info']['port']}")
     else:
         print(f"Error: {result['message']}")
         sys.exit(1)
