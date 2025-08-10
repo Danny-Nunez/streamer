@@ -32,6 +32,21 @@ app.add_middleware(
 # Create a thread pool for YouTube operations
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
+@app.on_event("startup")
+async def startup_event():
+    """Log startup information"""
+    print("🚀 YouTube Audio Stream API starting up...")
+    print(f"📦 Python version: {os.sys.version}")
+    print(f"🌐 Server will run on port: {os.getenv('PORT', '8000')}")
+    print("✅ Startup complete!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    print("🛑 Shutting down YouTube Audio Stream API...")
+    executor.shutdown(wait=True)
+    print("✅ Shutdown complete!")
+
 def extract_video_id(url_or_id: str) -> str:
     """Extract video ID from URL or return if already an ID"""
     if len(url_or_id) == 11 and re.match(r'^[a-zA-Z0-9_-]{11}$', url_or_id):
@@ -227,4 +242,5 @@ async def test_endpoint():
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
+    print(f"Starting server on port {port}")
     uvicorn.run("main_robust:app", host="0.0.0.0", port=port, reload=False) 
