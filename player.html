@@ -1,141 +1,82 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Audio Player</title>
+    <title>Audio Player</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
-            margin: 0 auto;
+            margin: 20px auto;
             padding: 20px;
             background-color: #f5f5f5;
         }
         .player-container {
-            background-color: white;
+            background: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .audio-player {
-            width: 100%;
-            margin: 20px 0;
-        }
         .info {
-            margin: 10px 0;
-            color: #666;
+            margin-bottom: 20px;
         }
-        .title {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #333;
+        audio {
+            width: 100%;
+            margin-top: 20px;
         }
-        .author {
-            color: #666;
-        }
-        .error {
-            color: red;
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #fff3f3;
-            border-radius: 4px;
-        }
-        .status {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-            display: none;
-        }
-        .success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-        }
-        .error {
-            background-color: #ffebee;
-            color: #c62828;
+        .file-select {
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
     <div class="player-container">
-        <div id="player-info"></div>
-        <audio id="audio-player" class="audio-player" controls></audio>
-        <div id="status" class="status"></div>
+        <div class="file-select">
+            <label for="audioFile">Select Audio File:</label>
+            <select id="audioFile" onchange="loadAudio()">
+                <option value="">Choose a file...</option>
+            </select>
+        </div>
+        <div class="info" id="info"></div>
+        <audio id="player" controls>
+            Your browser does not support the audio element.
+        </audio>
     </div>
 
     <script>
-        // Parse URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const data = JSON.parse(decodeURIComponent(urlParams.get('data')));
-
-        // Display video information
-        const playerInfo = document.getElementById('player-info');
-        playerInfo.innerHTML = `
-            <div class="title">${data.title}</div>
-            <div class="author">${data.author}</div>
-            <div class="info">Format: ${data.format} | Bitrate: ${data.bitrate}</div>
-        `;
-
-        // Set up audio player
-        const audioPlayer = document.getElementById('audio-player');
-        const statusDiv = document.getElementById('status');
-        
-        if (data.local_path) {
-            // Use local file if available
-            audioPlayer.src = data.local_path;
-            
-            // Handle cleanup after playback
-            audioPlayer.addEventListener('ended', () => {
-                cleanupFile(data.local_path);
-            });
-            
-            // Handle cleanup when leaving the page
-            window.addEventListener('beforeunload', () => {
-                cleanupFile(data.local_path);
-            });
-        } else {
-            // Fallback to direct URL if local file not available
-            audioPlayer.src = data.url;
-            playerInfo.innerHTML += '<div class="error">Warning: Using direct stream URL. Playback may not work.</div>';
+        async function loadAudioFiles() {
+            try {
+                const response = await fetch('audios');
+                const files = await response.text();
+                const audioFiles = files.match(/audio_\d+\.mp3/g) || [];
+                
+                const select = document.getElementById('audioFile');
+                select.innerHTML = '<option value="">Choose a file...</option>';
+                
+                audioFiles.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading audio files:', error);
+            }
         }
 
-        function cleanupFile(filepath) {
-            // Extract filename from path
-            const filename = filepath.split('/').pop();
+        function loadAudio() {
+            const select = document.getElementById('audioFile');
+            const player = document.getElementById('player');
+            const info = document.getElementById('info');
             
-            // Send cleanup request to server
-            fetch('/api/cleanup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ filename: filename })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    showStatus('File cleaned up successfully', 'success');
-                } else {
-                    showStatus('Failed to clean up file', 'error');
-                }
-            })
-            .catch(error => {
-                showStatus('Error cleaning up file', 'error');
-                console.error('Cleanup error:', error);
-            });
+            if (select.value) {
+                player.src = `audios/${select.value}`;
+                player.load();
+                info.textContent = `Playing: ${select.value}`;
+            }
         }
 
-        function showStatus(message, type) {
-            statusDiv.textContent = message;
-            statusDiv.className = `status ${type}`;
-            statusDiv.style.display = 'block';
-            
-            // Hide status after 3 seconds
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, 3000);
-        }
+        // Load audio files when page loads
+        window.onload = loadAudioFiles;
     </script>
 </body>
 </html> 
